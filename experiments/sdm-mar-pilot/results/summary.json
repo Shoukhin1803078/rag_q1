@@ -1,0 +1,201 @@
+{
+  "n_questions": 60,
+  "n_runs": 790,
+  "conditions": [
+    "baseline",
+    "caption",
+    "oracle_bridge"
+  ],
+  "baseline_success_overall": 0.4666666666666667,
+  "baseline_success_by_H": {
+    "1": 0.5333333333333333,
+    "2": 0.44,
+    "3": 0.4222222222222222
+  },
+  "model_metrics": {
+    "A": {
+      "auc": 0.5141369047619047,
+      "brier": 0.25223553545829164,
+      "logloss": 0.6978068993776871,
+      "cal_slope": -0.18915174286266206,
+      "cal_intercept": -0.15769874439220385
+    },
+    "B": {
+      "auc": 0.7005208333333334,
+      "brier": 0.21628345585228537,
+      "logloss": 0.6280157141893401,
+      "cal_slope": 0.7789886289265053,
+      "cal_intercept": 0.001917338330058711
+    },
+    "C": {
+      "auc": 0.8002232142857143,
+      "brier": 0.17737898272690614,
+      "logloss": 0.5571326439715399,
+      "cal_slope": 0.7597772637011528,
+      "cal_intercept": -0.05249296633476004
+    }
+  },
+  "delta_auc_C_minus_A": {
+    "delta_auc": 0.28608630952380965,
+    "ci_lo": 0.1423305147058824,
+    "ci_hi": 0.4320971880884745,
+    "n_boot_ok": 2000
+  },
+  "ablations": [
+    {
+      "variant": "full",
+      "n_features": 9,
+      "auc": 0.8002232142857143,
+      "brier": 0.17737898272690614,
+      "logloss": 0.5571326439715399,
+      "cal_slope": 0.7597772637011528,
+      "cal_intercept": -0.05249296633476004
+    },
+    {
+      "variant": "hop_only",
+      "n_features": 1,
+      "auc": 0.5141369047619047,
+      "brier": 0.25223553545829164,
+      "logloss": 0.6978068993776871,
+      "cal_slope": -0.18915174286266206,
+      "cal_intercept": -0.15769874439220385
+    },
+    {
+      "variant": "hop+csl",
+      "n_features": 2,
+      "auc": 0.7974330357142857,
+      "brier": 0.17974149085139102,
+      "logloss": 0.5524206385155079,
+      "cal_slope": 0.8941539434586742,
+      "cal_intercept": -0.008438153681469378
+    },
+    {
+      "variant": "hop+csl+ms",
+      "n_features": 3,
+      "auc": 0.7777157738095237,
+      "brier": 0.18748694713728453,
+      "logloss": 0.5778390786973047,
+      "cal_slope": 0.771058147797751,
+      "cal_intercept": -0.001765059669630428
+    },
+    {
+      "variant": "minus_H",
+      "n_features": 8,
+      "auc": 0.8195684523809522,
+      "brier": 0.17181403099298737,
+      "logloss": 0.5268350898568281,
+      "cal_slope": 0.907483686100564,
+      "cal_intercept": -0.026071630595735105
+    },
+    {
+      "variant": "minus_CSL",
+      "n_features": 8,
+      "auc": 0.7686011904761905,
+      "brier": 0.19791508731940594,
+      "logloss": 0.6130909856164319,
+      "cal_slope": 0.6947482225805994,
+      "cal_intercept": -0.049161431292618844
+    },
+    {
+      "variant": "minus_MS",
+      "n_features": 8,
+      "auc": 0.7998511904761906,
+      "brier": 0.1770344271199904,
+      "logloss": 0.555658665197522,
+      "cal_slope": 0.7655765627698072,
+      "cal_intercept": -0.05340869917381823
+    },
+    {
+      "variant": "minus_RC",
+      "n_features": 8,
+      "auc": 0.8002232142857143,
+      "brier": 0.17737898272690988,
+      "logloss": 0.5571326439715484,
+      "cal_slope": 0.7597772637011372,
+      "cal_intercept": -0.052492966334734284
+    }
+  ],
+  "condition_success": {
+    "baseline": 0.4666666666666667,
+    "caption": 0.5166666666666667,
+    "oracle_bridge": 1.0
+  },
+  "interventions": {
+    "oracle_gain_by_H": {
+      "1": 0.4666666666666667,
+      "2": 0.56,
+      "3": 0.5777777777777778
+    },
+    "caption_gain_by_MS": {
+      "0": 0.02702702702702703,
+      "1": 0.09523809523809523,
+      "2": 0.0
+    },
+    "caption_gain_by_has_image": {
+      "False": -0.06666666666666667,
+      "True": 0.08888888888888889
+    }
+  },
+  "dimension_sweep": [
+    {
+      "dim": 32.0,
+      "csl_bin": "low CSL",
+      "success": 0.07692307692307693
+    },
+    {
+      "dim": 32.0,
+      "csl_bin": "high CSL",
+      "success": 0.0
+    },
+    {
+      "dim": 64.0,
+      "csl_bin": "low CSL",
+      "success": 0.07692307692307693
+    },
+    {
+      "dim": 64.0,
+      "csl_bin": "high CSL",
+      "success": 0.0
+    },
+    {
+      "dim": 128.0,
+      "csl_bin": "low CSL",
+      "success": 0.3076923076923077
+    },
+    {
+      "dim": 128.0,
+      "csl_bin": "high CSL",
+      "success": 0.08333333333333333
+    },
+    {
+      "dim": 256.0,
+      "csl_bin": "low CSL",
+      "success": 0.38461538461538464
+    },
+    {
+      "dim": 256.0,
+      "csl_bin": "high CSL",
+      "success": 0.125
+    },
+    {
+      "dim": 512.0,
+      "csl_bin": "low CSL",
+      "success": 0.5
+    },
+    {
+      "dim": 512.0,
+      "csl_bin": "high CSL",
+      "success": 0.125
+    }
+  ],
+  "dimension_gain_by_csl": {
+    "low CSL": 0.4230769230769231,
+    "high CSL": 0.125
+  },
+  "hop_success_by_modality": {
+    "I": 0.20378151260504201,
+    "T": 0.3393316195372751
+  },
+  "product_law_mae": 0.3497399211688955,
+  "product_law_corr": 0.09688062617504367
+}

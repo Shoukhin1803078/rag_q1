@@ -1,0 +1,40 @@
+seed: 42
+
+corpus:
+  n_filler_docs: 1200          # background documents so the index is realistic
+  topics: [alpha, beta, gamma, delta, epsilon, zeta, eta, theta, iota, kappa]
+  relations: [founder, capital, director, origin, successor, operator, motto, chair, patron, rival]
+
+questions:
+  n_questions: 60
+  hops: [1, 2, 3]              # H sampled uniformly
+  csl_levels: [0, 1, 3, 9]     # number of near-duplicate distractors per hop (>1 shares subject+relation)
+  p_image: 0.5                 # P(a text-only reader recovers a bridge from an image node)
+  modality_p: 0.5              # P(a node is an image)
+
+retriever:
+  kind: bm25                   # bm25 | svd
+  top_k: 3
+  dims: [32, 64, 128, 256, 512]
+
+runs:
+  replicates: 3
+  conditions: [baseline, oracle_bridge, caption]
+  dim_subsample: 25
+  dim_replicates: 2
+
+ollama:
+  host: http://localhost:11434
+  model: qwen2.5:3b-instruct
+  temperature: 0.4
+  num_predict: 16
+  timeout: 120
+  logprobs: false
+
+models:
+  l2: 1.0
+
+paths:
+  corpus: cache/corpus.json
+  cache: cache/runs.jsonl
+  results: results
