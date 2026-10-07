@@ -151,35 +151,38 @@ def calibration_study(frame: pd.DataFrame, cfg: dict) -> List[dict]:
             }
         )
 
-    # Difficulty transfer: calibrate on 'easy', evaluate on 'hard' (and vice versa).
-    for a, b in [(cfg["splits"]["transfer_a"], cfg["splits"]["transfer_b"]),
-                 (cfg["splits"]["transfer_b"], cfg["splits"]["transfer_a"])]:
-        src = [q for q in qids if frame.loc[frame["qid"] == q, "level"].iloc[0] == a]
-        dst = [q for q in qids if frame.loc[frame["qid"] == q, "level"].iloc[0] == b]
-        if not src or not dst:
-            continue
-        for B in budgets:
-            for signal_col in ("max_score", "unc0"):
-                tau = calibrate_gate(frame, signal_col, B, k_on, k_off, src)
-                choices = (
-                    policies.policy_similarity_gate(frame, tau, k_on, k_off)
-                    if signal_col == "max_score"
-                    else policies.policy_uncertainty_gate(frame, tau, k_on, k_off)
-                )
-                res = policies.evaluate(frame, {q: choices[q] for q in dst})
-                rows.append(
-                    {
-                        "setting": f"transfer {a}->{b}",
-                        "signal": signal_col,
-                        "target_B": B,
-                        "tau": tau,
-                        "realized_B": res["realized_budget"],
-                        "abs_err": abs(res["realized_budget"] - B),
-                        "err_mean": float("nan"),
-                        "err_median": float("nan"),
-                        "err_p95": float("nan"),
-                        "f1": res["f1"],
-                        "harm_rate": res["harm_rate"],
-                    }
-                )
+    # Difficulty/category transfer: calibrate on one stratum, evaluate on another.
+    strata, strata_name = policies.resolve_strata(frame)
+    groups: Dict[str, List[str]] = {}
+    for q, s in strata.items():
+        groups.setdefault(str(s), []).append(q)
+    labels = sorted(groups, key=lambda s: -len(groups[s]))[:2]
+    if len(labels) == 2:
+        a, b = labels
+        for src_lbl, dst_lbl in [(a, b), (b, a)]:
+            src, dst = groups[src_lbl], groups[dst_lbl]
+            for B in budgets:
+                for signal_col in ("max_score", "unc0"):
+                    tau = calibrate_gate(frame, signal_col, B, k_on, k_off, src)
+                    choices = (
+                        policies.policy_similarity_gate(frame, tau, k_on, k_off)
+                        if signal_col == "max_score"
+                        else policies.policy_uncertainty_gate(frame, tau, k_on, k_off)
+                    )
+                    res = policies.evaluate(frame, {q: choices[q] for q in dst})
+                    rows.append(
+                        {
+                            "setting": f"transfer {src_lbl}->{dst_lbl}",
+                            "signal": signal_col,
+                            "target_B": B,
+                            "tau": tau,
+                            "realized_B": res["realized_budget"],
+                            "abs_err": abs(res["realized_budget"] - B),
+                            "err_mean": float("nan"),
+                            "err_median": float("nan"),
+                            "err_p95": float("nan"),
+                            "f1": res["f1"],
+                            "harm_rate": res["harm_rate"],
+                        }
+                    )
     return rows

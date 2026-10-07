@@ -10,6 +10,8 @@ Model: `qwen2.5:3b-instruct` (CPU, Ollama) · n=50 HotpotQA (distractor) questio
 
 Mean F1 by k: k=0: 0.117, k=1: 0.199, k=3: 0.254, k=5: 0.230, k=10: 0.201
 
+Stratified by **qtype** (bridge: 41, comparison: 9).
+
 **Peak F1 at k=3.** Non-monotonic (inverted-U) benefit reproduced.
 
 ## 2. Retrieval harm (RQ3 / H3)
@@ -28,7 +30,7 @@ Mean F1 by k: k=0: 0.117, k=1: 0.199, k=3: 0.254, k=5: 0.230, k=10: 0.201
 - corr(context size in tokens, prefill time) = **0.90** (context chars vs prefill: 0.90)
 - corr(context chars, total time) = **0.86**
 - k is a monotone but coarse proxy: corr(k, prefill time) = **0.84**, yet within a single k the context size still varies (max coefficient of variation **0.32** at k=1) — equal-document-count queries differ materially in prefill/decode cost.
-- 0 pathological CPU stall(s) excluded from the cost analysis (decode tail latency is noisy on shared CPU; motivates measuring TPOT(L) curves properly).
+- decode tail latency is noisy on a shared CPU; the prefill signal above is the reliable part.
 
 ## 4. Budget calibration (RQ2 / H2)
 
@@ -37,6 +39,8 @@ Mean F1 by k: k=0: 0.117, k=1: 0.199, k=3: 0.254, k=5: 0.230, k=10: 0.201
 - max_score: mean |B̂−B| = **0.167**, max = 0.347
 - unc0: mean |B̂−B| = **0.080**, max = 0.200
 - uncertainty_uncalibrated: mean |B̂−B| = **0.275**, max = 0.637
+- transfer bridge->comparison: mean |B̂−B| = **0.239** (transfer calibration)
+- transfer comparison->bridge: mean |B̂−B| = **0.187** (transfer calibration)
 
 ## 5. Quality–cost frontier & matched-budget comparison (RQ1/RQ5)
 

@@ -69,7 +69,9 @@ def main() -> None:
 
     # ---------- Fig 1: quality vs k (inverted-U) ----------
     per_k = frame.groupby("k")[["f1", "em"]].mean()
-    by_level = frame.groupby(["level", "k"])[["f1"]].mean().unstack(0)
+    strata, strata_name = policies.resolve_strata(frame)
+    frame["stratum"] = frame["qid"].map(strata)
+    by_strata = frame.groupby(["stratum", "k"])[["f1"]].mean().unstack(0)
     fig, ax = plt.subplots(1, 2, figsize=(9, 3.4))
     ax[0].plot(per_k.index, per_k["f1"], "o-", label="F1")
     ax[0].plot(per_k.index, per_k["em"], "s--", label="EM")
@@ -77,15 +79,16 @@ def main() -> None:
     ax[0].set_ylabel("score")
     ax[0].set_title("Quality vs retrieval depth")
     ax[0].legend()
-    for col in by_level.columns:
-        ax[1].plot(by_level.index, by_level[col], "o-", label=str(col))
+    for col in by_strata.columns:
+        ax[1].plot(by_strata.index, by_strata[col], "o-", label=str(col[-1]))
     ax[1].set_xlabel("retrieval depth k")
     ax[1].set_ylabel("F1")
-    ax[1].set_title("F1 vs k by difficulty")
+    ax[1].set_title(f"F1 vs k by {strata_name} (n={len(strata)})")
     ax[1].legend()
     fig.tight_layout()
     fig.savefig(os.path.join(out, "fig_inverted_u.png"))
     plt.close(fig)
+    summary["strata"] = {"name": strata_name, "counts": {str(k): int(v) for k, v in strata.value_counts().items()}}
     summary["quality_by_k"] = {int(k): float(v) for k, v in per_k["f1"].items()}
 
     # ---------- Fig 2: delta-Q / harm ----------
@@ -223,7 +226,7 @@ def main() -> None:
         ax[1].plot([0, 1], [0, 1], "k:", lw=1)
         ax[1].set_xlabel("target budget B")
         ax[1].set_ylabel("realized budget B̂")
-        ax[1].set_title("Calibration under difficulty transfer")
+        ax[1].set_title(f"Calibration under {strata_name} transfer")
         ax[1].legend(fontsize=7)
     fig.tight_layout()
     fig.savefig(os.path.join(out, "fig_calibration.png"))
@@ -293,6 +296,8 @@ def _write_report(out, cfg, summary, per_k, rates, calib_df, table_df):
     lines.append("## 1. Quality vs retrieval depth\n")
     lines.append("![](" + "fig_inverted_u.png)\n")
     lines.append("Mean F1 by k: " + ", ".join(f"k={k}: {v:.3f}" for k, v in qk.items()) + "\n")
+    lines.append(f"Stratified by **{summary['strata']['name']}** "
+                 f"({', '.join(f'{k}: {v}' for k, v in summary['strata']['counts'].items())}).\n")
     lines.append(f"**Peak F1 at k={best_k}.** " +
                  ("Non-monotonic (inverted-U) benefit reproduced." if best_k not in (0, max(qk))
                   else "Benefit monotonic in this sample; check N before drawing conclusions.") + "\n")
@@ -313,8 +318,10 @@ def _write_report(out, cfg, summary, per_k, rates, calib_df, table_df):
                  f"yet within a single k the context size still varies (max coefficient of variation "
                  f"**{cp['worst_within_k_cv']:.2f}** at k={cp['worst_within_k']}) — equal-document-count "
                  f"queries differ materially in prefill/decode cost.")
-    lines.append(f"- {cp['n_stalled_dropped']} pathological CPU stall(s) excluded from the cost analysis "
-                 f"(decode tail latency is noisy on shared CPU; motivates measuring TPOT(L) curves properly).\n")
+    if cp["n_stalled_dropped"]:
+        lines.append(f"- {cp['n_stalled_dropped']} pathological CPU stall(s) excluded from the cost analysis "
+                     f"(decode tail latency is noisy on shared CPU; motivates measuring TPOT(L) curves properly).")
+    lines.append("- decode tail latency is noisy on a shared CPU; the prefill signal above is the reliable part.\n")
 
     lines.append("## 4. Budget calibration (RQ2 / H2)\n")
     lines.append("![](" + "fig_calibration.png)\n")
@@ -323,6 +330,10 @@ def _write_report(out, cfg, summary, per_k, rates, calib_df, table_df):
         d = ind[ind["signal"] == sig]
         if not d.empty:
             lines.append(f"- {sig}: mean |B̂−B| = **{d['abs_err'].mean():.3f}**, max = {d['abs_err'].max():.3f}")
+    tr = calib_df[calib_df["setting"].str.startswith("transfer")]
+    if not tr.empty:
+        for setting, g in tr.groupby("setting"):
+            lines.append(f"- {setting}: mean |B̂−B| = **{g['abs_err'].mean():.3f}** (transfer calibration)")
     lines.append("")
 
     lines.append("## 5. Quality–cost frontier & matched-budget comparison (RQ1/RQ5)\n")

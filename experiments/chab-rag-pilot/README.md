@@ -26,11 +26,14 @@ work is paid exactly once.
 - Backbone: `qwen2.5:3b-instruct` via Ollama (CPU).
 - Data: HotpotQA `distractor` split — 10 candidate paragraphs/question, so no
   separate corpus index is needed.
+- Stratification is adaptive: annotation `level` → `qtype` → retrieval-confidence
+  median split (HotpotQA distractor validation is all `hard`, so `qtype` is used).
 - Ranking: BM25 (`rank_bm25`); `--retriever dense` optional (needs
   `sentence-transformers`). Gold paragraphs are not forced first, so hard
   negatives can appear.
 - Cost: tracked in tokens (prompt + completion) and time (prefill + decode),
-  captured from Ollama's timing fields.
+  captured from Ollama's timing fields. Pathological CPU stalls are flagged and
+  excluded from cost analysis only.
 
 ## Setup
 
@@ -49,13 +52,26 @@ Quick check (~a minute):
 .venv/bin/python -m src.analyze
 ```
 
-Full pilot (~150 questions × k∈{0,1,3,5,10}; one overnight run on a laptop CPU):
+Full pilot (config default: 50 questions × k∈{0,1,3,5,10} ≈ 250 generations;
+~1–2 min when cached, ~10 min cold on a laptop CPU):
 
 ```bash
 bash scripts/run_pilot.sh
 ```
 
-The grid runner is **resumable** — re-running skips cached `(qid, k)` pairs.
+Raise `data.n_questions` in `config.yaml` to scale up (each extra question ≈ 5
+generations). The grid runner is **resumable** — re-running skips cached
+`(qid, k)` pairs, so increasing N only pays for the new questions.
+
+## Headline results (50-question pilot)
+
+- **Non-monotonic benefit:** F1 peaks at k=3 (0.254) and falls at k=5/10 (0.230/0.201) — inverted-U reproduced (RQ3/premise).
+- **Retrieval harm exists:** 8–12% of queries are harmed by retrieval, rising at k=10.
+- **Cost ∝ context length, not doc count:** corr(context tokens, prefill time) = 0.90, but at a fixed k the context size still varies (CV up to 0.32).
+- **Calibration is feasible:** calibrated uncertainty gate gets mean |B̂−B| = 0.080 vs 0.275 uncalibrated; transfer across `qtype` shows miscalibration (0.24) — a real finding.
+- **Controller is honest-mixed:** the simple ridge ΔQ predictor is anti-correlated with actual ΔF1 (r=−0.29), so CHAB-lite only wins at low budgets; fixed-k is a strong baseline here. See `results/PRELIMINARY_RESULTS.md`.
+
+Numbers are indicative only (small N, one backbone, one dataset).
 
 ## Config
 

@@ -91,6 +91,24 @@ def question_signals(frame: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def resolve_strata(frame: pd.DataFrame):
+    """Pick a usable difficulty/category axis for stratification.
+
+    Preference: annotation level -> question type -> retrieval-confidence median
+    split (HotpotQA distractor validation is often all 'hard').
+    """
+    levels = frame.groupby("qid")["level"].first()
+    if levels.nunique() >= 2:
+        return levels, "level"
+    qt = frame.groupby("qid")["qtype"].first()
+    vc = qt.value_counts()
+    if qt.nunique() >= 2 and vc.min() >= 5:
+        return qt, "qtype"
+    conf = question_signals(frame)["max_score"]
+    med = conf.median()
+    return conf.ge(med).map({True: "high-conf", False: "low-conf"}), "retrieval-confidence"
+
+
 def split_questions(frame: pd.DataFrame, cfg: dict):
     """Deterministic calibration / evaluation split of question ids."""
     rng = np.random.default_rng(cfg["seed"])
