@@ -1,0 +1,40 @@
+seed: 42
+
+data:
+  hf_name: hotpotqa/hotpot_qa
+  hf_config: distractor
+  split: validation
+  n_questions: 30
+  cache_dir: data
+
+retriever: bm25
+top_k: 5
+
+# E1/E8: decode-scaling curve TPOT(L)
+scaling:
+  lengths: [256, 512, 1024, 2048, 4096]
+  replicates: 2
+  # a question that reliably spends the full num_predict budget, so decode cost
+  # is comparable across context lengths
+  question: "Describe in detail how a bicycle works, listing its main parts and what each does."
+
+# E2/E3/E4/E7: compression methods
+compression:
+  methods: [full, fixed_0.5, fixed_0.2, rel_iso, decaf_lam6, decaf_lam15, decaf_nocov_lam6]
+  decaf_primary: decaf_lam6     # its retained count defines the iso-budget baseline
+  lambda: 1.5
+  fixed_ratios: [0.5, 0.2]
+
+ollama:
+  host: http://localhost:11434
+  model: qwen2.5:3b-instruct
+  temperature: 0.0
+  num_predict: 32
+  num_ctx: 8192
+  timeout: 900
+  logprobs: false
+
+paths:
+  scaling_cache: cache/scaling.jsonl
+  compress_cache: cache/compression.jsonl
+  results: results
