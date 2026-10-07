@@ -37,13 +37,15 @@
     }
   },
   "cost_proxy": {
-    "corr_k_vs_latency": 0.04032405868237937,
-    "corr_contextchars_vs_latency": 0.07926271225145694,
-    "corr_prompttokens_vs_tpot": 0.0510669680444811,
-    "mid_k": 3,
-    "mid_k_latency_max_over_min": 4.077189290420361,
-    "mid_k_latency_std_ms": 590.3134866487106
+    "corr_prompttokens_vs_prefill": 0.9020868669847462,
+    "corr_contextchars_vs_prefill": 0.8976622254302588,
+    "corr_contextchars_vs_total": 0.8566655520209013,
+    "corr_k_vs_prefill": 0.8424709090369403,
+    "worst_within_k_cv": 0.32300195540315435,
+    "worst_within_k": 1,
+    "n_stalled_dropped": 0
   },
+  "delta_predictor_corr": -0.29055971165184596,
   "policy_frontiers": {
     "fixed": [
       {

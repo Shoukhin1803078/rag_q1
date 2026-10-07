@@ -25,10 +25,10 @@ Mean F1 by k: k=0: 0.117, k=1: 0.199, k=3: 0.254, k=5: 0.230, k=10: 0.201
 
 ![](fig_cost_vs_length.png)
 
-- corr(k, latency) = **0.04**
-- corr(context chars, latency) = **0.08**
-- corr(prompt tokens, TPOT) = **0.05**
-- at fixed k=3, max/min latency spread = **4.08×** (std 590.3 ms)
+- corr(context size in tokens, prefill time) = **0.90** (context chars vs prefill: 0.90)
+- corr(context chars, total time) = **0.86**
+- k is a monotone but coarse proxy: corr(k, prefill time) = **0.84**, yet within a single k the context size still varies (max coefficient of variation **0.32** at k=1) — equal-document-count queries differ materially in prefill/decode cost.
+- 0 pathological CPU stall(s) excluded from the cost analysis (decode tail latency is noisy on shared CPU; motivates measuring TPOT(L) curves properly).
 
 ## 4. Budget calibration (RQ2 / H2)
 
@@ -41,6 +41,10 @@ Mean F1 by k: k=0: 0.117, k=1: 0.199, k=3: 0.254, k=5: 0.230, k=10: 0.201
 ## 5. Quality–cost frontier & matched-budget comparison (RQ1/RQ5)
 
 ![](fig_pareto.png)
+
+CHAB-lite ΔQ predictor quality (corr of predicted vs actual ΔF1 on the held-out split) = **-0.29** — a deliberately simple ridge model; a weak value indicates the cheap features under-predict retrieval benefit at this scale.
+
+Table = best quality achievable **within** each target budget (realized ≤ target).
 
 |   target_B | policy           |   realized_B |    F1 |   EM |   harm_rate |   mean_k |
 |-----------:|:-----------------|-------------:|------:|-----:|------------:|---------:|

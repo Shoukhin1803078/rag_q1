@@ -125,36 +125,44 @@ def main() -> None:
     summary["effect_rates_by_k"] = {int(k): rates[k] for k in kk}
 
     # ---------- Fig 3: cost is driven by length, not doc count ----------
-    corr_doc = float(np.corrcoef(frame["k"], frame["total_ms"])[0, 1])
-    corr_len = float(np.corrcoef(frame["context_chars"], frame["total_ms"])[0, 1])
-    corr_pt = float(np.corrcoef(frame["prompt_tokens"], frame["tpot_ms"])[0, 1])
-    mid_k = ks_present[len(ks_present) // 2]
-    k_mid = frame[frame["k"] == mid_k]
-    spread = (
-        float(k_mid["total_ms"].max() / max(k_mid["total_ms"].min(), 1e-9))
-        if len(k_mid) > 1
-        else float("nan")
-    )
+    rob = frame[~frame["stalled"]]
+    corr_prefill = float(np.corrcoef(rob["prompt_tokens"], rob["prefill_ms"])[0, 1])
+    corr_len_prefill = float(np.corrcoef(rob["context_chars"], rob["prefill_ms"])[0, 1])
+    corr_len_total = float(np.corrcoef(rob["context_chars"], rob["total_ms"])[0, 1])
+    corr_k_prefill = float(np.corrcoef(rob["k"], rob["prefill_ms"])[0, 1])
+    # Within a fixed k, context size still varies widely -> doc count is coarse.
+    within = rob.groupby("k")["prompt_tokens"]
+    cv = (within.std() / within.mean()).dropna()
+    worst_k = int(cv.idxmax()) if len(cv) else ks_present[0]
+    worst_cv = float(cv.max()) if len(cv) else float("nan")
+    n_stalled = int(frame["stalled"].sum())
+
     fig, ax = plt.subplots(1, 2, figsize=(9, 3.4))
-    sc = ax[0].scatter(frame["context_chars"], frame["total_ms"], c=frame["k"], cmap="viridis", s=10)
-    ax[0].set_xlabel("retrieved context length (chars)")
-    ax[0].set_ylabel("total latency (ms)")
-    ax[0].set_title(f"Latency vs context length (r={corr_len:.2f})")
+    sc = ax[0].scatter(rob["prompt_tokens"], rob["prefill_ms"], c=rob["k"], cmap="viridis", s=12)
+    if len(rob) > 1:
+        m, b = np.polyfit(rob["prompt_tokens"], rob["prefill_ms"], 1)
+        xs = np.linspace(rob["prompt_tokens"].min(), rob["prompt_tokens"].max(), 50)
+        ax[0].plot(xs, m * xs + b, "r--", lw=1)
+    ax[0].set_xlabel("prompt tokens (context size)")
+    ax[0].set_ylabel("prefill time (ms)")
+    ax[0].set_title(f"Prefill cost tracks context length (r={corr_prefill:.2f})")
     fig.colorbar(sc, ax=ax[0], label="k")
-    ax[1].scatter(frame["prompt_tokens"], frame["tpot_ms"], s=10, alpha=0.5)
-    ax[1].set_xlabel("prompt tokens (prefill size)")
-    ax[1].set_ylabel("time per output token (ms)")
-    ax[1].set_title(f"TPOT vs prompt tokens (r={corr_pt:.2f})")
+    boxes = [rob.loc[rob["k"] == k, "prompt_tokens"].values for k in ks_present]
+    ax[1].boxplot(boxes, tick_labels=[str(k) for k in ks_present], showfliers=False)
+    ax[1].set_xlabel("retrieval depth k")
+    ax[1].set_ylabel("prompt tokens")
+    ax[1].set_title(f"Same k ⇒ different context size (max CV={worst_cv:.2f} at k={worst_k})")
     fig.tight_layout()
     fig.savefig(os.path.join(out, "fig_cost_vs_length.png"))
     plt.close(fig)
     summary["cost_proxy"] = {
-        "corr_k_vs_latency": corr_doc,
-        "corr_contextchars_vs_latency": corr_len,
-        "corr_prompttokens_vs_tpot": corr_pt,
-        "mid_k": mid_k,
-        "mid_k_latency_max_over_min": spread,
-        "mid_k_latency_std_ms": float(k_mid["total_ms"].std()) if len(k_mid) > 1 else float("nan"),
+        "corr_prompttokens_vs_prefill": corr_prefill,
+        "corr_contextchars_vs_prefill": corr_len_prefill,
+        "corr_contextchars_vs_total": corr_len_total,
+        "corr_k_vs_prefill": corr_k_prefill,
+        "worst_within_k_cv": worst_cv,
+        "worst_within_k": worst_k,
+        "n_stalled_dropped": n_stalled,
     }
 
     # ---------- Policy frontiers (offline, on eval split) ----------
@@ -179,6 +187,13 @@ def main() -> None:
                         "uncertainty-gate", unc_q)
 
     model, feat_cols = policies.fit_delta_model(frame, calib_qids)
+    sub_eval = frame[frame["qid"].isin(eval_qids)].dropna(subset=feat_cols + ["delta_f1"])
+    if len(sub_eval) > 2:
+        d_hat_eval = model.predict(sub_eval[feat_cols].values)
+        pred_corr = float(np.corrcoef(d_hat_eval, sub_eval["delta_f1"])[0, 1])
+    else:
+        pred_corr = float("nan")
+    summary["delta_predictor_corr"] = pred_corr
     lam_range = np.linspace(0.0, 2.0, 11)
     chab_pts = _frontier(frame, eval_qids,
                          lambda l: policies.policy_chab_lite(frame, model, feat_cols, l, cfg["controller"]["mu"], ks_present),
@@ -291,11 +306,15 @@ def _write_report(out, cfg, summary, per_k, rates, calib_df, table_df):
 
     lines.append("## 3. Cost is driven by context length, not document count (RQ4 / C3)\n")
     lines.append("![](" + "fig_cost_vs_length.png)\n")
-    lines.append(f"- corr(k, latency) = **{cp['corr_k_vs_latency']:.2f}**")
-    lines.append(f"- corr(context chars, latency) = **{cp['corr_contextchars_vs_latency']:.2f}**")
-    lines.append(f"- corr(prompt tokens, TPOT) = **{cp['corr_prompttokens_vs_tpot']:.2f}**")
-    lines.append(f"- at fixed k={cp['mid_k']}, max/min latency spread = **{cp['mid_k_latency_max_over_min']:.2f}×** "
-                 f"(std {cp['mid_k_latency_std_ms']:.1f} ms)\n")
+    lines.append(f"- corr(context size in tokens, prefill time) = **{cp['corr_prompttokens_vs_prefill']:.2f}** "
+                 f"(context chars vs prefill: {cp['corr_contextchars_vs_prefill']:.2f})")
+    lines.append(f"- corr(context chars, total time) = **{cp['corr_contextchars_vs_total']:.2f}**")
+    lines.append(f"- k is a monotone but coarse proxy: corr(k, prefill time) = **{cp['corr_k_vs_prefill']:.2f}**, "
+                 f"yet within a single k the context size still varies (max coefficient of variation "
+                 f"**{cp['worst_within_k_cv']:.2f}** at k={cp['worst_within_k']}) — equal-document-count "
+                 f"queries differ materially in prefill/decode cost.")
+    lines.append(f"- {cp['n_stalled_dropped']} pathological CPU stall(s) excluded from the cost analysis "
+                 f"(decode tail latency is noisy on shared CPU; motivates measuring TPOT(L) curves properly).\n")
 
     lines.append("## 4. Budget calibration (RQ2 / H2)\n")
     lines.append("![](" + "fig_calibration.png)\n")
@@ -308,6 +327,11 @@ def _write_report(out, cfg, summary, per_k, rates, calib_df, table_df):
 
     lines.append("## 5. Quality–cost frontier & matched-budget comparison (RQ1/RQ5)\n")
     lines.append("![](" + "fig_pareto.png)\n")
+    lines.append(f"CHAB-lite ΔQ predictor quality (corr of predicted vs actual ΔF1 on the held-out "
+                 f"split) = **{summary.get('delta_predictor_corr', float('nan')):.2f}** — a deliberately "
+                 f"simple ridge model; a weak value indicates the cheap features under-predict retrieval "
+                 f"benefit at this scale.\n")
+    lines.append("Table = best quality achievable **within** each target budget (realized ≤ target).\n")
     if not table_df.empty:
         lines.append(table_df.to_markdown(index=False) + "\n")
 

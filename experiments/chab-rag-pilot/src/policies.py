@@ -58,6 +58,10 @@ def build_frame(records: List[dict], kmax: Optional[int] = None) -> pd.DataFrame
     df["delta_em"] = df["em"] - df["em_0"]
     df["harm_f1"] = np.maximum(0.0, -df["delta_f1"])
 
+    # CPU tail-latency guard: flag pathological stalls (e.g. sleep/swap) so they
+    # do not corrupt cost analysis. Quality metrics are unaffected.
+    df["stalled"] = (df["tpot_ms"] > 1000.0) | (df["total_ms"] > 30000.0)
+
     # Normalise cost per question by the cost of the largest k available.
     kmax = kmax if kmax is not None else int(df["k"].max())
     top = df[df["k"] == kmax].set_index("qid")
